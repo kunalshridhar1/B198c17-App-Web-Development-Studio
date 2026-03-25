@@ -53,6 +53,7 @@ herrensuits/
 ├── .env
 ├── package.json
 └── tsconfig.json
+'''
 
 ⚙️ Installation & Setup
 1️⃣ Clone the repository

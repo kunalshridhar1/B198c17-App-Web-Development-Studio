@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Herrensuits Products</title>
+
+<style>
+body { margin:0; font-family:Arial; background:#f4f6f9; }
+
+.navbar {
+  display:flex;
+  justify-content:space-between;
+  padding:20px 40px;
+  background:#956363;
+  box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+
+.logo {
+  font-size:30px;
+  font-weight:bold;
+}
+
+.bgcolor {
+  background:#5d708b;
+}
+
+.products {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+  gap:20px;
+  padding:20px;
+}
+
+.product {
+  background:#fff;
+  border-radius:12px;
+  overflow:hidden;
+  transition:0.3s;
+}
+
+.product:hover {
+  transform:translateY(-6px);
+  box-shadow:0 15px 30px rgba(0,0,0,0.15);
+}
+
+.product-img {
+  width:100%;
+  aspect-ratio:1/1;
+  object-fit:cover;
+  transition:transform 0.4s ease;
+}
+
+.product:hover .product-img {
+  transform:scale(1.08);
+}
+
+.product-info { padding:15px; }
+
+.price {
+  color:#2c5aa0;
+  font-weight:bold;
+}
+
+button {
+  width:50%;
+  padding:10px 15px;
+  margin-top:10px;
+  background:#2c5aa0;
+  color:white;
+  border:none;
+  cursor:pointer;
+}
+
+.cart {
+  cursor:pointer;
+  background:#2c5aa0;
+  color:white;
+  padding:10px 15px;
+  border-radius:20px;
+}
+
+.cart.add-product {
+  background: #28a745;
+}
+
+/* CART PAGE */
+#cartPage {
+  padding:20px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="navbar">
+  <div class="logo">Herrensuits</div>
+  <div class="cart" onclick="showCartPage()">
+    🛒 <span id="cartCount">0</span>
+  </div>
+  <div class="cart" onclick="showOrdersPage()">
+  📦 Orders
+</div>
+<div class="cart add-product" onclick="showAddProductPage()">
+  ➕ Add Product  
+</div>  
+<div class="cart" style="background:#6c757d;" onclick="showDashboard()">
+  📊 Dashboard    
+</div>
+</div>
+
+
+<div style="padding:20px; display:flex; gap:10px;">
+  <input id="searchInput" placeholder="Search suits..." style="flex:1;padding:10px;">
+  
+  <select id="categoryFilter" style="padding:10px;">
+    <option value="">All</option>
+    <option value="Business Suits">Business</option>
+    <option value="Wedding Suits">Wedding</option>
+  </select>
+
+  <button onclick="applyFilters()">Search</button>
+</div>
+
+<div class="products" id="products"></div>
+
+<div id="cartPage" style="display:none;"></div>
+<div id="ordersPage" style="display:none; padding:20px;"></div>
+
+<div id="addProductPage" style="display:none;padding:20px;">
+  <h2>Add Product</h2>
+
+  <input id="pname" placeholder="Name"><br><br>
+  <input id="pprice" placeholder="Price"><br><br>
+  <input id="pimage" placeholder="Image URL"><br><br>
+
+  <button onclick="createProduct()">Create</button>
+  <button onclick="goBack()">Back</button>
+</div>
+
+<div id="dashboardPage" style="display:none;padding:20px;">
+  <h2>Dashboard</h2>
+  <p>Total Products: <span id="totalProducts"></span></p>
+  <p>Total Orders: <span id="totalOrders"></span></p>
+  <button onclick="goBack()">Back</button>
+</div>
+
+<script>
+let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+let productsData = [];
+
+
+// APPLY FILTERS
+function applyFilters() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const category = document.getElementById('categoryFilter').value;
+
+  const filtered = productsData.filter(p => {
+    const nameMatch = p.name.en.toLowerCase().includes(search);
+    const categoryMatch = !category || p.category?.en === category;
+    return nameMatch && categoryMatch;
+  });
+
+  renderProducts(filtered);
+}
+
+
+// 🔥 fallback products
+const demoProducts = [
+  {
+    _id:"1",
+    name:{en:"Black Suit"},
+    priceEUR:120,
+    images:["https://images.unsplash.com/photo-1593032465171-8a3f2d9e7b5b"]
+  },
+  {
+    _id:"2",
+    name:{en:"Navy Suit"},
+    priceEUR:150,
+    images:["https://images.unsplash.com/photo-1521336575822-6da63fb45455"]
+  }
+];
+
+// LOAD PRODUCTS
+async function loadProducts() {
+  try {
+    const res = await fetch('http://localhost:3000/api/products');
+    const data = await res.json();
+
+    if (!data.products || data.products.length === 0) {
+      productsData = demoProducts;
+    } else {
+      productsData = data.products;
+    }
+
+    renderProducts(productsData);
+  } catch {
+    productsData = demoProducts;
+    renderProducts(productsData);
+  }
+}
+
+// RENDER PRODUCTS
+function renderProducts(products) {
+  const container = document.getElementById('products');
+
+  container.innerHTML = products.map(p => `
+    <div class="product">
+      <img src="${p.images?.[0]}" class="product-img"/>
+      <div class="product-info">
+        <h3>${p.name.en}</h3>
+        <div class="price">€${p.priceEUR}</div>
+        <button onclick="addToCart('${p._id}')">Add to Cart</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ADD TO CART
+function addToCart(id) {
+  const existing = cart.find(i => i.productId === id);
+
+  if (existing) existing.quantity++;
+  else cart.push({ productId:id, quantity:1 });
+
+  localStorage.setItem('cart', JSON.stringify(cart));
+  updateCart();
+}
+//sub to CART
+function removeItem(id) {
+  const item = cart.find(i => i.productId === id);
+
+  if (!item) return;
+
+  if (item.quantity > 1) {
+    item.quantity--;
+  } else {
+    // remove if quantity = 1
+    cart = cart.filter(i => i.productId !== id);
+  }
+
+  localStorage.setItem('cart', JSON.stringify(cart));
+  updateCart();
+  renderCartPage();
+}
+
+// UPDATE CART COUNT
+function updateCart() {
+  const count = cart.reduce((s,i)=>s+i.quantity,0);
+  document.getElementById('cartCount').innerText = count;
+  const cartBtn = document.querySelector('.cart');
+  if (count > 0) {  
+    cartBtn.style.background = '#28a745';
+  } else {
+    cartBtn.style.background = '#2c5aa0';
+  }   
+}
+
+// SHOW CART PAGE
+function showCartPage() {
+  document.getElementById('products').style.display = 'none';
+  document.getElementById('cartPage').style.display = 'block';
+  renderCartPage();
+}
+
+// BACK TO PRODUCTS
+function goBack() {
+  document.getElementById('cartPage').style.display = 'none';
+  document.getElementById('products').style.display = 'grid';
+  document.getElementById('ordersPage').style.display = 'none';
+  document.getElementById('addProductPage').style.display = 'none';
+  document.getElementById('dashboardPage').style.display = 'none';
+
+}
+
+// RENDER CART
+function renderCartPage() {
+  const container = document.getElementById('cartPage');
+
+  if (cart.length === 0) {
+    container.innerHTML = "<h2>Cart is empty</h2><button onclick='goBack()'>Back</button>";
+    return;
+  }
+
+  let total = 0;
+
+  const html = cart.map(item => {
+    const p = productsData.find(x => x._id === item.productId);
+    const sub = p.priceEUR * item.quantity;
+    total += sub;
+
+    return `
+      <div style="display:flex; gap:15px; margin-bottom:15px;">
+        <img src="${p.images?.[0]}" style="width:80px; aspect-ratio:1/1; object-fit:cover;">
+        <div>
+          <h4>${p.name.en}</h4>
+          <p>€${p.priceEUR}</p>
+          <p>Qty: ${item.quantity}</p>
+          <button onclick="addToCart('${p._id}')">Add</button>
+          <button onclick="removeItem('${p._id}')">Remove</button>
+          <button onclick="deleteItem('${p._id}')">Delete Item</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+  <h2>Your Cart</h2>
+  ${html}
+  <h3>Total: €${total}</h3>
+
+  <button onclick="checkout()" style="
+    padding:15px;
+    background:#28a745;
+    color:white;
+    border:none;
+    width:50%;
+    font-size:18px;
+    cursor:pointer;
+  ">
+    💳 Checkout
+  </button>
+
+  <button onclick="goBack()">Back</button>
+`;
+  
+}
+
+// REMOVE ITEM
+async function checkout() {
+  if (cart.length === 0) {
+    alert("Cart is empty");
+    return;
+  }
+
+  try {
+    const res = await fetch("http://localhost:3000/api/orders/checkout", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ items: cart })
+    });
+
+    const data = await res.json();
+
+    if (data.url) {
+      window.location.href = data.url; // 🔥 Redirect to Stripe
+    } else {
+      alert("Checkout failed");
+      console.log(data);
+    }
+
+  } catch (error) {
+    console.error("Checkout error:", error);
+    alert("Server error during checkout");
+  }
+}
+
+
+// SHOW ORDERS PAGE
+function showOrdersPage() {
+  document.getElementById('products').style.display = 'none';
+  document.getElementById('cartPage').style.display = 'none';
+  document.getElementById('ordersPage').style.display = 'block';
+  
+
+  loadOrders();
+}
+
+
+async function loadOrders() {
+  try {
+    console.log("Loading orders...");
+
+    const res = await fetch("http://localhost:3000/api/orders");
+
+    console.log("Status:", res.status);
+
+    const text = await res.text();
+    console.log("RAW:", text);
+
+    const data = JSON.parse(text);
+
+    renderOrders(data.orders || []);
+
+  } catch (err) {
+    console.error("ERROR:", err);
+
+    document.getElementById('ordersPage').innerHTML = `
+      <h2>❌ Error loading orders</h2>
+      <p>${err.message}</p>
+    `;
+  }
+}
+
+function renderOrders(orders) {
+
+  if (!orders || orders.length === 0) {
+    orders = [
+      {
+        _id: "Grey Pinstripe Suit",
+        items: [{ quantity: 2 }],
+        totalEUR: 299,
+        createdAt: new Date().toISOString()
+      }
+      
+    ];
+  }
+
+
+  const container = document.getElementById('ordersPage');
+
+  container.innerHTML = orders.map(o => `
+    <div style="background:white;padding:15px;margin-bottom:10px;border-radius:10px;">
+      <h3>Order #${o._id}</h3>
+      <p>Total: €${o.totalEUR}</p>
+      <p>Items: ${o.items.length}</p>
+      <p>Date: ${new Date(o.createdAt).toLocaleString()}</p>
+    </div>
+  `).join('');
+}
+
+// SHOW ADD PRODUCT PAGE
+function showAddProductPage() {
+  document.getElementById('products').style.display = 'none';
+  document.getElementById('cartPage').style.display = 'none';
+  document.getElementById('ordersPage').style.display = 'none';
+  document.getElementById('dashboardPage').style.display = 'none';
+
+  document.getElementById('addProductPage').style.display = 'block';
+}
+
+function showAddProductPage() {
+  document.getElementById('products').style.display = 'none';
+  document.getElementById('addProductPage').style.display = 'block';
+}
+
+async function createProduct() {
+  const name = document.getElementById('pname').value;
+  const price = document.getElementById('pprice').value;
+  const image = document.getElementById('pimage').value;
+
+  await fetch('http://localhost:3000/api/products', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: { en: name },
+      priceEUR: Number(price),
+      images: [image],
+      stock: 10
+    })
+  });
+
+  alert("Product added!");
+  goBack();
+  loadProducts();
+}
+
+async function showDashboard() {
+  document.getElementById('products').style.display = 'none';
+  document.getElementById('dashboardPage').style.display = 'block';
+
+  const p = await fetch('http://localhost:3000/api/products').then(r => r.json());
+  const o = await fetch('http://localhost:3000/api/orders').then(r => r.json());
+
+  document.getElementById('totalProducts').innerText = p.products.length;
+  document.getElementById('totalOrders').innerText = o.orders.length;
+}
+
+// INIT
+updateCart();
+loadProducts();
+</script>
+
+</body>
+</html>
